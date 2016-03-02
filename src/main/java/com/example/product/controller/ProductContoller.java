@@ -3,7 +3,6 @@ package com.example.product.controller;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -24,7 +23,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.couchbase.client.java.Bucket;
 import com.couchbase.client.java.document.JsonDocument;
-import com.couchbase.client.java.document.json.JsonArray;
 import com.couchbase.client.java.document.json.JsonObject;
 import com.couchbase.client.java.error.DocumentAlreadyExistsException;
 import com.couchbase.client.java.view.ViewQuery;
@@ -48,7 +46,7 @@ public class ProductContoller {
 	@RequestMapping("/allproducts")
 	@ResponseBody
 	public ResponseEntity<String> getAllProducts(@RequestParam(required = false) Integer offset,
-			@RequestParam(required = false) Integer limit) {
+			@RequestParam(required = false) Integer limit) throws JsonParseException, JsonMappingException, IOException {
 		ViewQuery query = ViewQuery.from("product_id", "by_id");
 		if (limit != null && limit > 0) {
 			query.limit(limit);
@@ -60,15 +58,9 @@ public class ProductContoller {
 		if (!result.success()) {
 			return new ResponseEntity<String>(result.error().toString(), HttpStatus.INTERNAL_SERVER_ERROR);
 		} else {
-			JsonArray keys = JsonArray.create();
-			Iterator<ViewRow> iter = result.rows();
-			while (iter.hasNext()) {
-				ViewRow row = iter.next();
-				JsonObject prod = JsonObject.create();
-				prod.put(row.id(), row.value());
-				keys.add(prod);
-			}
-			return new ResponseEntity<String>(keys.toString(), HttpStatus.OK);
+			ObjectMapper objectMapper = new ObjectMapper();
+			List<Product> listTitle = getAttributeList(result);
+			return new ResponseEntity<String>(objectMapper.writeValueAsString(listTitle), HttpStatus.OK);
 		}
 	}
 
@@ -157,13 +149,18 @@ public class ProductContoller {
 	private List<Product> getAttributeList(ViewResult result) throws JsonParseException, JsonMappingException, IOException{
 		List<Product> listTitle = new ArrayList<Product>();
 		ObjectMapper mapper = new ObjectMapper();
-		JsonArray keys = JsonArray.create();
-		Iterator<ViewRow> iter = result.rows();
-		while (iter.hasNext()) {
-			ViewRow row = iter.next();
-			Product prod = mapper.readValue(row.value().toString(), Product.class);
+		List<ViewRow> listRows = result.allRows();
+		
+		listRows.forEach(name -> {
+				Product prod = null;
+				try {
+					prod = mapper.readValue(name.value().toString(), Product.class);
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+			
 			listTitle.add(prod);
-		}
+		});
 		return listTitle;
 	}
 	
@@ -179,21 +176,19 @@ public class ProductContoller {
 		} else {
 			if (attribute.equalsIgnoreCase("color")) {
 				listTitle = getAttributeList(result);
-				Type type = new TypeToken<List<Product>>() {
-				}.getType();
+				
 				List<Product> resul = listTitle.stream().filter(P -> P.getColor().equals(property))
 						.collect(Collectors.toList());
 				return new ResponseEntity<String>(resul.toString(), HttpStatus.OK);
 			}else if(attribute.equalsIgnoreCase("size")){
 				listTitle = getAttributeList(result);
-				Type type = new TypeToken<List<Product>>() {}.getType();
+				
 				List<Product> resul = listTitle.stream().filter(P ->  P.getSize()==Integer.parseInt(property))
 						.collect(Collectors.toList());
 				return new ResponseEntity<String>(resul.toString(), HttpStatus.OK);
 			}
-			
+			return new ResponseEntity<String>(" choose between:color,size or Inputerror", HttpStatus.METHOD_NOT_ALLOWED);
 		}
-		return new ResponseEntity<String>(" choose between:color,size", HttpStatus.METHOD_NOT_ALLOWED);
 	}
 
 }
