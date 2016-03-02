@@ -20,16 +20,42 @@ public class Product implements Serializable{
 	private String description;
 	private String primaryImage;
 	private String category;
+	private String color;
+	public String getColor() {
+		return color;
+	}
+
+	public void setColor(String color) {
+		this.color = color;
+	}
+
+	public int getSize() {
+		return size;
+	}
+
+	public void setSize(int size) {
+		this.size = size;
+	}
+
+	@Override
+	public String toString() {
+		return "Product [id=" + id + ", title=" + title + ", description=" + description + ", primaryImage="
+				+ primaryImage + ", category=" + category + ", color=" + color + ", size=" + size + "]";
+	}
+
+	private int size;
 
 	public Product() {
 	}
 
-	public Product(String title, String description, String primaryImage, String category) {
+	public Product(String title, String description, String primaryImage, String category, String color, int size) {
 		super();
 		this.title = title;
 		this.description = description;
 		this.primaryImage = primaryImage;
 		this.category = category;
+		this.color = color;
+		this.size = size;
 	}
 
 	public Long getId() {
@@ -60,11 +86,6 @@ public class Product implements Serializable{
 		this.category = category;
 	}
 
-	@Override
-	public String toString() {
-		return "Product [id=" + id + ", title=" + title + ", description=" + description + ", primaryImage="
-				+ primaryImage + ", category=" + category + "]";
-	}
 
 	public void setId(Long id) {
 		this.id = id;
