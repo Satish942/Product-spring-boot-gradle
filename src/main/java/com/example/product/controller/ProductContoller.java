@@ -63,7 +63,7 @@ public class ProductContoller {
 	}
 
 	@RequestMapping(method = RequestMethod.GET, value = "/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
-	public ResponseEntity<String> getProduct(@PathVariable String id) {
+	public ResponseEntity<String> getProduct(@PathVariable("id") String id) {
 		JsonDocument doc = bucket.get(id);
 		if (doc != null) {
 			return new ResponseEntity<String>(doc.content().toString(), HttpStatus.OK);
@@ -82,7 +82,7 @@ public class ProductContoller {
 	public ResponseEntity<String> createProduct(@RequestBody Product inputObject) {
 		String id = "";
 		try {
-			new ProductValidator().validte(inputObject);
+			if(new ProductValidator().validte(inputObject)){
 			JsonObject prod =JsonObject.create();
 			prod.put("id", inputObject.getId());
 			prod.put("title", inputObject.getTitle());
@@ -91,15 +91,15 @@ public class ProductContoller {
 			prod.put("category", inputObject.getCategory());
 			bucket.insert(JsonDocument.create(inputObject.getId().toString(), prod));
 			return new ResponseEntity<String>(inputObject.getId().toString(), HttpStatus.CREATED);
+			}
 		} catch (IllegalArgumentException e) {
 			return new ResponseEntity<String>(HttpStatus.BAD_REQUEST);
 		} catch (DocumentAlreadyExistsException e) {
 			return new ResponseEntity<String>("Id " + id + " already exist", HttpStatus.CONFLICT);
 		} catch (Exception e) {
-			e.printStackTrace();
 			return new ResponseEntity<String>(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
 		}
+		return null;
 	}
 
-	
 }
