@@ -1,6 +1,10 @@
 package com.example.product;
 
+import java.io.IOException;
+
 import org.apache.http.protocol.HTTP;
+import org.codehaus.jackson.JsonParseException;
+import org.codehaus.jackson.map.JsonMappingException;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.FixMethodOrder;
@@ -50,7 +54,45 @@ public class ProductApplicationTests {
 	public void testCGetProduct(){
 		
 		ResponseEntity<String> result=prodContoller.getProduct(product.getId().toString());
-		System.out.println(":::>"+product.getId().toString());
+		Assert.assertEquals(HttpStatus.OK, result.getStatusCode());
+	}
+	
+	@Test
+	public void testBProductGetAll() throws JsonParseException, JsonMappingException, IOException{
+		ResponseEntity<String> result=prodContoller.getAllProducts(5, 100);
+		Assert.assertEquals(HttpStatus.OK, result.getStatusCode());
+	}
+	
+
+	@Test
+	public void testBProductGetByTitleToken() throws JsonParseException, JsonMappingException, IOException{
+		ResponseEntity<String> result=prodContoller.searchProductByTitleToken("mont");
+		Assert.assertEquals(HttpStatus.OK, result.getStatusCode());
+	}
+	
+	@Test
+	public void testBProductUpdate() throws JsonParseException, JsonMappingException, IOException{
+		product.setColor("green");
+		product.setSize(99);
+		ResponseEntity<String> result=prodContoller.updateProduct(product);
+		Assert.assertNotNull(result);
+		Assert.assertEquals(HttpStatus.OK, result.getStatusCode());
+	}
+	
+	@Test
+	public void testBFilerAttribute() throws JsonParseException, JsonMappingException, IOException{
+		product.setColor("red");
+		product.setSize(99);
+		ResponseEntity<String> result=prodContoller.fileterAttribute("color", "red");
+		Assert.assertNotNull(result);
+		Assert.assertEquals(HttpStatus.OK, result.getStatusCode());
+	}
+	@Test
+	public void testBFilerAttributeSize() throws JsonParseException, JsonMappingException, IOException{
+		product.setColor("green");
+		product.setSize(99);
+		ResponseEntity<String> result=prodContoller.fileterAttribute("size", "99");
+		Assert.assertNotNull(result);
 		Assert.assertEquals(HttpStatus.OK, result.getStatusCode());
 	}
 	
