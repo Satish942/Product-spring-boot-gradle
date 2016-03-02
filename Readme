@@ -1,0 +1,16 @@
+
+Run Application - find result based on request types 
+
+http://localhost:8080/product/allproducts
+
+http://localhost:8080/product/update
+
+http://localhost:8080/product/create
+
+http://localhost:8080/product/delete
+
+http://localhost:8080/product/{id}
+
+http://localhost:8080/product/searchtitle/{pat}
+
+http://localhost:8080/product/attribute/{attrbute}/{value}
