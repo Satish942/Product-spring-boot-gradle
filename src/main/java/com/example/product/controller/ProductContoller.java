@@ -6,6 +6,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import javax.validation.Valid;
+
+import org.codehaus.jackson.JsonGenerationException;
 import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
@@ -13,6 +16,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.WebDataBinder;
+import org.springframework.web.bind.annotation.InitBinder;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -30,6 +36,7 @@ import com.couchbase.client.java.view.ViewResult;
 import com.couchbase.client.java.view.ViewRow;
 import com.example.product.entity.Product;
 import com.example.product.validate.ProductValidator;
+import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
 @RestController
@@ -43,10 +50,19 @@ public class ProductContoller {
 		this.bucket = bucket;
 	}
 
+	@Autowired
+	private ProductValidator prodValidator;
+
+	@InitBinder
+	private void initBinder(WebDataBinder binder) {
+		binder.setValidator(prodValidator);
+	}
+
 	@RequestMapping("/allproducts")
 	@ResponseBody
 	public ResponseEntity<String> getAllProducts(@RequestParam(required = false) Integer offset,
-			@RequestParam(required = false) Integer limit) throws JsonParseException, JsonMappingException, IOException {
+			@RequestParam(required = false) Integer limit)
+					throws JsonParseException, JsonMappingException, IOException {
 		ViewQuery query = ViewQuery.from("product_id", "by_id");
 		if (limit != null && limit > 0) {
 			query.limit(limit);
@@ -64,9 +80,9 @@ public class ProductContoller {
 		}
 	}
 
-	@RequestMapping(method = RequestMethod.GET, value = "/{id}", produces = MediaType.TEXT_PLAIN_VALUE)
+	@RequestMapping(method = RequestMethod.GET, value = "/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<String> getProduct(@PathVariable("id") String id) {
+	public ResponseEntity<String> getProduct(@PathVariable("id") String id) throws JsonGenerationException, JsonMappingException, IOException {
 		JsonDocument doc = bucket.get(id);
 		if (doc != null) {
 			return new ResponseEntity<String>(doc.content().toString(), HttpStatus.OK);
@@ -84,14 +100,16 @@ public class ProductContoller {
 
 	@RequestMapping(method = RequestMethod.POST, value = "/create", consumes = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<String> createProduct(@RequestBody Product inputObject) {
+	public ResponseEntity<String> createProduct(@Valid @RequestBody Product inputObject, BindingResult result) {
 		String id = "";
+		ObjectMapper objectMapper = new ObjectMapper();
 		try {
-			if (new ProductValidator().validte(inputObject)) {
-				JsonObject prod = productToJsonObjConverter(inputObject);
-				bucket.insert(JsonDocument.create(inputObject.getId().toString(), prod));
-				return new ResponseEntity<String>(inputObject.getId().toString(), HttpStatus.CREATED);
+			if (result.hasErrors()) {
+				return new ResponseEntity<String>(result.getFieldError().toString(), HttpStatus.INTERNAL_SERVER_ERROR);
 			}
+			JsonObject prod = productToJsonObjConverter(inputObject);
+			bucket.insert(JsonDocument.create(inputObject.getId().toString(), prod));
+			return new ResponseEntity<String>(objectMapper.writeValueAsString(inputObject.getId().toString()), HttpStatus.CREATED);
 		} catch (IllegalArgumentException e) {
 			return new ResponseEntity<String>(HttpStatus.BAD_REQUEST);
 		} catch (DocumentAlreadyExistsException e) {
@@ -99,12 +117,12 @@ public class ProductContoller {
 		} catch (Exception e) {
 			return new ResponseEntity<String>(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
 		}
-		return null;
 	}
 
-	@RequestMapping(method = RequestMethod.GET, value = "/searchtitle/{token}", produces = MediaType.TEXT_PLAIN_VALUE)
+	@RequestMapping(method = RequestMethod.GET, value = "/searchtitle/{token}", produces = MediaType.APPLICATION_JSON_VALUE)
 	public ResponseEntity<String> searchProductByTitleToken(@PathVariable final String token)
 			throws JsonParseException, JsonMappingException, IOException {
+		ObjectMapper objectMapper = new ObjectMapper();
 		ViewQuery query = ViewQuery.from("products", "by_title");
 		List<Product> listTitle = new ArrayList<Product>();
 		ViewResult result = bucket.query(query);
@@ -112,22 +130,22 @@ public class ProductContoller {
 			return new ResponseEntity<String>(result.error().toString(), HttpStatus.INTERNAL_SERVER_ERROR);
 		} else {
 			listTitle = getAttributeList(result);
-			Type type = new TypeToken<List<Product>>() {
-			}.getType();
+			
 			List<Product> resul = listTitle.stream().filter(P -> P.getTitle().contains(token))
 					.collect(Collectors.toList());
-			return new ResponseEntity<String>(resul.toString(), HttpStatus.OK);
+			return new ResponseEntity<String>(objectMapper.writeValueAsString(resul.toString()), HttpStatus.OK);
 		}
 	}
 
 	@RequestMapping(method = RequestMethod.PUT, value = "/update", consumes = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<String> updateProduct(@RequestBody Product inputObject) {
+	public ResponseEntity<String> updateProduct(@RequestBody Product inputObject) throws JsonGenerationException, JsonMappingException, IOException {
 		JsonDocument doc = bucket.get(inputObject.getId().toString());
+		ObjectMapper objectMapper = new ObjectMapper();
 		if (doc != null) {
 			JsonObject prod = productToJsonObjConverter(inputObject);
 			bucket.upsert(JsonDocument.create(inputObject.getId().toString(), prod));
-			return new ResponseEntity<String>(inputObject.getId().toString(), HttpStatus.OK);
+			return new ResponseEntity<String>(objectMapper.writeValueAsString(inputObject.getId().toString()), HttpStatus.OK);
 		} else {
 			return new ResponseEntity<String>(HttpStatus.NOT_FOUND);
 		}
@@ -145,29 +163,30 @@ public class ProductContoller {
 		prod.put("size", product.getSize());
 		return prod;
 	}
-	
-	private List<Product> getAttributeList(ViewResult result) throws JsonParseException, JsonMappingException, IOException{
+
+	private List<Product> getAttributeList(ViewResult result)
+			throws JsonParseException, JsonMappingException, IOException {
 		List<Product> listTitle = new ArrayList<Product>();
 		ObjectMapper mapper = new ObjectMapper();
 		List<ViewRow> listRows = result.allRows();
-		
+
 		listRows.forEach(name -> {
-				Product prod = null;
-				try {
-					prod = mapper.readValue(name.value().toString(), Product.class);
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
-			
+			Product prod = null;
+			try {
+				prod = mapper.readValue(name.value().toString(), Product.class);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+
 			listTitle.add(prod);
 		});
 		return listTitle;
 	}
-	
 
-	@RequestMapping(method = RequestMethod.GET, value = "attribute/{attribute}/{property}", produces = MediaType.TEXT_PLAIN_VALUE)
+	@RequestMapping(method = RequestMethod.GET, value = "attribute/{attribute}/{property}", produces = MediaType.APPLICATION_JSON_VALUE)
 	public ResponseEntity<String> fileterAttribute(@PathVariable final String attribute,
 			@PathVariable final String property) throws JsonParseException, JsonMappingException, IOException {
+		ObjectMapper mapper = new ObjectMapper();
 		ViewQuery query = ViewQuery.from("product_id", "by_id");
 		List<Product> listTitle = new ArrayList<Product>();
 		ViewResult result = bucket.query(query);
@@ -176,18 +195,19 @@ public class ProductContoller {
 		} else {
 			if (attribute.equalsIgnoreCase("color")) {
 				listTitle = getAttributeList(result);
-				
-				List<Product> resul = listTitle.stream().filter(P -> P.getColor().equals(property))
+
+				List<Product> sizeColor = listTitle.stream().filter(P -> P.getColor().equals(property))
 						.collect(Collectors.toList());
-				return new ResponseEntity<String>(resul.toString(), HttpStatus.OK);
-			}else if(attribute.equalsIgnoreCase("size")){
+				return new ResponseEntity<String>(mapper.writeValueAsString(sizeColor), HttpStatus.OK);
+			} else if (attribute.equalsIgnoreCase("size")) {
 				listTitle = getAttributeList(result);
-				
-				List<Product> resul = listTitle.stream().filter(P ->  P.getSize()==Integer.parseInt(property))
+
+				List<Product> sizeResult = listTitle.stream().filter(P -> P.getSize() == Integer.parseInt(property))
 						.collect(Collectors.toList());
-				return new ResponseEntity<String>(resul.toString(), HttpStatus.OK);
+				return new ResponseEntity<String>(mapper.writeValueAsString(sizeResult), HttpStatus.OK);
 			}
-			return new ResponseEntity<String>(" choose between:color,size or Inputerror", HttpStatus.METHOD_NOT_ALLOWED);
+			return new ResponseEntity<String>(" choose between:color,size or Inputerror",
+					HttpStatus.METHOD_NOT_ALLOWED);
 		}
 	}
 

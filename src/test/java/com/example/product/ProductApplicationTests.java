@@ -3,6 +3,7 @@ package com.example.product;
 import java.io.IOException;
 
 import org.apache.http.protocol.HTTP;
+import org.codehaus.jackson.JsonGenerationException;
 import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.map.JsonMappingException;
 import org.junit.Assert;
@@ -45,13 +46,13 @@ public class ProductApplicationTests {
 	
 	@Test 
 	public void testACreateProduct() {
-		ResponseEntity<String> result=prodContoller.createProduct(product);
+		ResponseEntity<String> result=prodContoller.createProduct(product, null);
 		Assert.assertEquals(HttpStatus.CREATED, result.getStatusCode());
 	}
 	
 	
 	@Test
-	public void testCGetProduct(){
+	public void testCGetProduct() throws JsonGenerationException, JsonMappingException, IOException{
 		
 		ResponseEntity<String> result=prodContoller.getProduct(product.getId().toString());
 		Assert.assertEquals(HttpStatus.OK, result.getStatusCode());
