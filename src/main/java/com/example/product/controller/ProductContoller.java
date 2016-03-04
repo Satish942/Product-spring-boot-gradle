@@ -1,7 +1,6 @@
 package com.example.product.controller;
 
 import java.io.IOException;
-import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -37,7 +36,6 @@ import com.couchbase.client.java.view.ViewRow;
 import com.example.product.entity.Product;
 import com.example.product.validate.ProductValidator;
 import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 
 @RestController
 @RequestMapping("/product")
@@ -167,19 +165,15 @@ public class ProductContoller {
 	private List<Product> getAttributeList(ViewResult result)
 			throws JsonParseException, JsonMappingException, IOException {
 		List<Product> listTitle = new ArrayList<Product>();
-		ObjectMapper mapper = new ObjectMapper();
 		List<ViewRow> listRows = result.allRows();
-
+	
 		listRows.forEach(name -> {
 			Product prod = null;
-			try {
-				prod = mapper.readValue(name.value().toString(), Product.class);
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-
+			Gson gson = new Gson();
+			prod = gson.fromJson(name.value().toString(), Product.class);
 			listTitle.add(prod);
 		});
+		
 		return listTitle;
 	}
 
